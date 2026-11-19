@@ -1,4 +1,6 @@
-# k2p-b1-merlin-ubuntu-edge
+# k2p-b1-ssr-to-ubuntu-mihomo-edge
+
+**K2P B1（SSR / `ssr-redir`）→ Ubuntu 盒子（`mihomo`）反向串联的家庭网络工程复盘。**
 
 一份**家庭局域网工程复盘**：在「K2P B1（华硕系固件）+ 一台百兆网口 Ubuntu 机顶盒」这套既有的、没法换的硬件上，如何把**边界路由 / 域名解析 / 出口转发**拆成三层职责，并把配置持久化、防回环、故障自愈这几件事做稳。
 
@@ -57,7 +59,7 @@
 ## 4. 仓库结构
 
 ```
-k2p-b1-merlin-ubuntu-edge/
+k2p-b1-ssr-to-ubuntu-mihomo-edge/
 ├── README.md
 ├── DISCLAIMER.md                     # 单独一页，出事时唯一能证明"没有分发意图"的书面材料
 ├── LICENSE                           # MIT
