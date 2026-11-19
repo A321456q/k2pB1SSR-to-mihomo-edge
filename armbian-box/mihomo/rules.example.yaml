@@ -1,0 +1,37 @@
+# =====================================================================
+# 分流规则骨架（片段，粘贴进 config.yaml 的对应段落）
+#
+# 只体现"DNS 解析策略 + 规则顺序"这两件事：
+#   1. 内网直连，且不向上游泄漏内网域名
+#   2. 名单来源用本地文件，路径由使用者自备
+#   3. 最后一条 MATCH 兜底
+# 不包含任何具体节点、订阅或远程名单地址。
+# =====================================================================
+
+dns:
+  nameserver-policy:
+    "*.lan": 192.0.2.53
+    "*.local": 192.0.2.53
+    "router.example": 192.0.2.53
+  # 需要独立解析的后缀，按自己的情况加
+  # "example.com": 192.0.2.53
+
+rule-providers:
+  edge_domains:
+    type: file              # 本地文件，不使用远程订阅
+    behavior: domain
+    format: text
+    path: ./rules/edge_domains.txt   # 自行生成并维护，不随仓库分发
+    interval: 86400
+
+rules:
+  # 1) 直连优先：内网与保留地址
+  - RULE-SET,private_domains,DIRECT
+  - GEOIP,PRIVATE,DIRECT,no-resolve
+  - IP-CIDR,192.0.2.0/24,DIRECT,no-resolve
+
+  # 2) 名单命中走出口层
+  - RULE-SET,edge_domains,PROXY
+
+  # 3) 兜底
+  - MATCH,DIRECT

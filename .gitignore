@@ -1,0 +1,48 @@
+# ---- 凭证与运行时配置 ----
+*.env
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+config.yaml
+config.yml
+!*.example
+!*.schema
+proxies.yaml
+proxies*.yaml
+nodes.json
+nodes*.json
+subscriptions*
+*sub*.txt
+*.ovpn
+
+# ---- 固件 / 构建产物 / 抓包 ----
+*.trx
+*.bin
+*.img
+*.deb
+*.apk
+*.ipk
+*.zip
+*.tar.gz
+*.pcap
+*.pcapng
+
+# ---- 日志与临时文件 ----
+*.log
+*.tmp
+*.bak
+*.orig
+.*.swp
+
+# ---- 系统垃圾 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+__pycache__/
+*.pyc
+.venv/
+node_modules/

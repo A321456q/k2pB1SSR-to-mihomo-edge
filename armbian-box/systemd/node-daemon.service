@@ -1,0 +1,28 @@
+[Unit]
+Description=Edge node health probe (contract example, no data source included)
+Documentation=file:///opt/edge/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=edge
+Group=edge
+EnvironmentFile=-/etc/edge/node-daemon.env
+ExecStart=/opt/edge/node-daemon.sh
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=10
+
+# 最小权限：只写状态目录，其余只读
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ReadWritePaths=/var/lib/edge
+
+[Install]
+WantedBy=multi-user.target

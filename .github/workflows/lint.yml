@@ -1,0 +1,50 @@
+name: lint
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell-and-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 脚本语法检查
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            head -n1 "$f" | grep -qE '^#!.*bash' && { bash -n "$f" || fail=1; continue; }
+            head -n1 "$f" | grep -qE '^#!.*(\/sh|env sh)' && { sh -n "$f" || fail=1; }
+          done < <(git ls-files)
+          exit $fail
+
+      - name: 敏感特征扫描
+        run: |
+          set +e
+          pat='(ss|ssr|vmess|vless|trojan|hysteria2?|tuic|snell|wireguard)://|BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[baprs]-'
+          out=$(grep -rInE "$pat" . \
+                 --exclude-dir=.git --exclude-dir=.github --exclude-dir=.githooks)
+          if [ -n "$out" ]; then
+            echo "$out"
+            echo "::error::仓库中出现疑似凭证或协议链接"
+            exit 1
+          fi
+          echo "clean"
+
+      - name: 占位地址检查（禁止出现真实内网/公网地址段）
+        run: |
+          # 只检查示例文件：文档里允许讨论 192.168.0.0/16 这类概念
+          bad=$(grep -rInE '(^|[^0-9.])(10\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])|192\.168)\.[0-9]{1,3}\.[0-9]{1,3}' \
+                  --include='*.example' --include='*.yaml' --include='*.schema' . || true)
+          if [ -n "$bad" ]; then
+            echo "$bad"
+            echo "::error::示例配置请使用 RFC 5737 文档保留段 (192.0.2.0/24)"
+            exit 1
+          fi
+          echo "clean"

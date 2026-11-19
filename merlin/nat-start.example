@@ -1,0 +1,45 @@
+#!/bin/sh
+# =====================================================================
+# 路由侧 NAT 规则骨架（仅示例，默认不执行）
+#
+# 目的：演示“先放行盒子、后做透明重定向”的顺序关系。
+# 不同固件的 nat 表链名、跳转点都不一样，照抄一定出事。
+#
+# 默认干跑：只打印将要执行的命令。
+# 确认无误后再用  APPLY=1 sh nat-start.example  执行。
+# =====================================================================
+APPLY="${APPLY:-0}"
+
+# RFC 5737 文档保留地址，全部为占位
+ROUTER_IP=192.0.2.1
+BOX_IP=192.0.2.3
+BOX_TPROXY_PORT=1234
+LOCAL_NET=192.0.2.0/24
+
+run() {
+  if [ "$APPLY" = "1" ]; then
+    echo "+ $*"
+    "$@"
+  else
+    echo "  $*"
+  fi
+}
+
+echo "== 1. 回环保护：盒子自身的出站流量必须先 RETURN =="
+run iptables -t nat -C PREROUTING -s "$BOX_IP" -j RETURN 2>/dev/null \
+  || run iptables -t nat -I PREROUTING 1 -s "$BOX_IP" -j RETURN
+
+echo "== 2. 内网目标不进代理（含路由器自身）=="
+run iptables -t nat -C PREROUTING -s "$LOCAL_NET" -d "$LOCAL_NET" -j RETURN 2>/dev/null \
+  || run iptables -t nat -I PREROUTING 2 -s "$LOCAL_NET" -d "$LOCAL_NET" -j RETURN
+
+echo "== 3. 透明转发：仅处理集合内目的地址（示例链名）=="
+run iptables -t nat -N EDGE_TPROXY 2>/dev/null || true
+run iptables -t nat -C PREROUTING -p tcp -m set --match-set edge_set dst -j EDGE_TPROXY 2>/dev/null \
+  || run iptables -t nat -A PREROUTING -p tcp -m set --match-set edge_set dst -j EDGE_TPROXY
+run iptables -t nat -A EDGE_TPROXY -p tcp -j REDIRECT --to-ports "$BOX_TPROXY_PORT"
+
+echo "== 4. 自检 =="
+run iptables -t nat -L PREROUTING -n -v --line-numbers
+
+[ "$APPLY" = "1" ] || echo "（干跑结束。确认后用 APPLY=1 执行；执行前先备份当前规则）"

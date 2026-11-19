@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# 提交前扫描：文件名黑名单 + 内容特征（凭证 / 订阅链接 / 私钥）
+# 安装：sh setup-hooks.sh
+# 临时跳过：git commit --no-verify（不建议）
+set -u
+
+if [ -t 1 ]; then
+  RED=$'\033[31m'; YEL=$'\033[33m'; DIM=$'\033[2m'; RST=$'\033[0m'
+else
+  RED=""; YEL=""; DIM=""; RST=""
+fi
+
+FILES=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$FILES" ] && exit 0
+
+FAIL=0
+
+echo "${DIM}pre-commit: 扫描暂存文件${RST}"
+
+# ---------- 1. 文件名黑名单 ----------
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  base=${f##*/}
+  case "$base" in
+    *.example|*.schema) continue ;;
+    .env|*.env|config.yaml|config.yml|proxies.yaml|proxies.yml|nodes.json|*.key|*.pem|*.p12|*.pfx|id_rsa*|id_ed25519*|*.trx|*.bin|*.img|*.deb|*.apk|*.ipk|*.zip|*.log)
+      echo "${RED}[BLOCK]${RST} 文件名命中黑名单: $f"
+      echo "        运行时配置/凭证/固件不应进仓库，请改用 *.example"
+      FAIL=1
+      ;;
+  esac
+done <<< "$FILES"
+
+# ---------- 2. 内容特征 ----------
+PATTERN='(ss|ssr|vmess|vless|trojan|hysteria2?|tuic|snell|wireguard)://|BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|hooks\.slack\.com/services|qyapi\.weixin\.qq\.com/cgi-bin/webhook|subscribe\?token='
+
+HIT_FILE=$(mktemp 2>/dev/null || echo "/tmp/precommit.$$")
+
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  [ -f "$f" ] || continue
+  case "$f" in
+    .githooks/*|.github/*) continue ;;   # 规则本身含关键字，不参与自检
+  esac
+
+  if grep -I -n -E "$PATTERN" "$f" >> "$HIT_FILE" 2>/dev/null; then
+    :
+  fi
+done <<< "$FILES"
+
+if [ -s "$HIT_FILE" ]; then
+  echo "${RED}[BLOCK]${RST} 内容命中敏感特征："
+  sed "s/^/        /" "$HIT_FILE"
+  echo "        提示：协议链接、私钥、云厂商 AK 一律不得提交。"
+  echo "        如果已经提交过，仅 rm 无效，需要 git filter-repo 重写历史。"
+  FAIL=1
+fi
+rm -f "$HIT_FILE"
+
+# ---------- 3. 大文件 ----------
+while IFS= read -r f; do
+  [ -n "$f" ] && [ -f "$f" ] || continue
+  size=$(wc -c < "$f" 2>/dev/null | tr -d ' ')
+  if [ "${size:-0}" -gt 1048576 ]; then
+    echo "${YEL}[WARN]${RST} 超过 1MB: $f ($size bytes)"
+    echo "        Release 只发源码，不要把构建产物或固件塞进 git 历史"
+  fi
+done <<< "$FILES"
+
+if [ "$FAIL" -ne 0 ]; then
+  echo "${RED}pre-commit 失败：请处理上述问题后重新提交${RST}"
+  exit 1
+fi
+
+echo "pre-commit: OK"
+exit 0

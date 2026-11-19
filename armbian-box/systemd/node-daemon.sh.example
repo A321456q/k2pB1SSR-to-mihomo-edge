@@ -1,0 +1,122 @@
+#!/bin/sh
+# =====================================================================
+# 外部探活与状态机示例（接口层，不含数据源）
+#
+# 它做什么：
+#   - 按固定间隔探测【使用者本地提供】的候选端点
+#   - 维护 UP / DEGRADED 状态，带冷却与宽限期
+#   - 把结果写成 JSON 状态文件，供上层读取
+#
+# 它不做什么：
+#   - 不下载、不抓取、不生成任何节点或配置
+#   - 不修改代理配置（RELOAD_CMD 默认为空，填了也只做一次信号通知）
+#
+# 输入文件格式（自行准备，权限 600，不要提交到仓库）：
+#   name|host|port
+#   示例：|192.0.2.10|443
+# =====================================================================
+set -u
+
+CANDIDATE_FILE="${CANDIDATE_FILE:-/etc/edge/candidates.list}"
+STATE_DIR="${STATE_DIR:-/var/lib/edge}"
+STATE_FILE="$STATE_DIR/state.json"
+LOG_TAG="${LOG_TAG:-edge-daemon}"
+
+PROBE_INTERVAL="${PROBE_INTERVAL:-600}"   # 10 分钟巡检
+COOLDOWN="${COOLDOWN:-7200}"              # 失败后 2 小时冷却
+GRACE="${GRACE:-180}"                     # 连续失败 3 分钟才判定降级
+FAIL_THRESHOLD="${FAIL_THRESHOLD:-3}"
+RELOAD_CMD="${RELOAD_CMD:-}"              # 留空 = 不做任何重载
+
+mkdir -p "$STATE_DIR" 2>/dev/null || true
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+
+now() { date +%s; }
+
+probe() {
+  _host="$1"
+  _port="$2"
+  if command -v nc >/dev/null 2>&1; then
+    nc -z -w 3 "$_host" "$_port" >/dev/null 2>&1
+    return $?
+  fi
+  # 没有 nc 就退化为解析检查（不算连通性，只防止脚本直接崩）
+  if command -v getent >/dev/null 2>&1; then
+    getent hosts "$_host" >/dev/null 2>&1
+    return $?
+  fi
+  return 2
+}
+
+write_state() {
+  _state="$1"
+  _ok="$2"
+  _total="$3"
+  _ts=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+  tmp="$STATE_FILE.tmp"
+  {
+    printf '{\n'
+    printf '  "state": "%s",\n' "$_state"
+    printf '  "healthy": %s,\n' "$_ok"
+    printf '  "total": %s,\n' "$_total"
+    printf '  "updated_at": "%s",\n' "$_ts"
+    printf '  "cooldown_seconds": %s\n' "$COOLDOWN"
+    printf '}\n'
+  } > "$tmp" && mv "$tmp" "$STATE_FILE"
+}
+
+log "启动：interval=${PROBE_INTERVAL}s cooldown=${COOLDOWN}s grace=${GRACE}s"
+
+last_reload=0
+state="UNKNOWN"
+
+while :; do
+  if [ ! -r "$CANDIDATE_FILE" ]; then
+    log "候选文件不可读: $CANDIDATE_FILE（仅写状态，不退出）"
+    write_state "NO_SOURCE" 0 0
+    sleep "$PROBE_INTERVAL"
+    continue
+  fi
+
+  ok=0
+  total=0
+  first_ts=$(now)
+
+  while IFS='|' read -r name host port; do
+    case "$name" in ''|'#'*) continue ;; esac
+    [ -n "$host" ] && [ -n "$port" ] || continue
+    total=$((total + 1))
+    if probe "$host" "$port"; then
+      ok=$((ok + 1))
+    fi
+  done < "$CANDIDATE_FILE"
+
+  elapsed=$(( $(now) - first_ts ))
+  if [ "$ok" -eq 0 ] && [ "$total" -gt 0 ] && [ "$elapsed" -lt "$GRACE" ]; then
+    log "宽限期内（${elapsed}s < ${GRACE}s），暂不判定降级"
+    sleep "$PROBE_INTERVAL"
+    continue
+  fi
+
+  if [ "$ok" -eq 0 ] && [ "$total" -gt 0 ]; then
+    new_state="DEGRADED"
+  elif [ "$ok" -eq 0 ]; then
+    new_state="EMPTY"
+  else
+    new_state="UP"
+  fi
+
+  if [ "$new_state" != "$state" ]; then
+    log "状态翻转: $state -> $new_state (healthy=$ok/$total)"
+    if [ -n "$RELOAD_CMD" ] && [ $(( $(now) - last_reload )) -ge "$COOLDOWN" ]; then
+      log "触发一次重载通知: $RELOAD_CMD"
+      sh -c "$RELOAD_CMD" >/dev/null 2>&1 || log "重载命令失败（不影响状态机）"
+      last_reload=$(now)
+    fi
+    state="$new_state"
+  fi
+
+  write_state "$new_state" "$ok" "$total"
+  sleep "$PROBE_INTERVAL"
+done

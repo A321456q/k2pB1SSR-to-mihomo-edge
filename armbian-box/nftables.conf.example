@@ -1,0 +1,53 @@
+#!/usr/sbin/nft -f
+# =====================================================================
+# 边界防护示例（不是可直接套用的规则集）
+#
+# 设计目标：盒子上跑的解析/出口端口，只允许边界路由访问，其余默认拒绝。
+# 全部地址为 RFC 5737 文档保留段（192.0.2.0/24）。
+#
+# ⚠️ 本文件以 flush ruleset 开头，直接 nft -f 会清空现有规则。
+#    请先 `nft list ruleset > /root/ruleset.bak`，并确认你有带外恢复手段。
+# =====================================================================
+flush ruleset
+
+table inet edge_filter {
+    set lan_net {
+        type ipv4_addr
+        flags interval
+        elements = { 192.0.2.0/24 }
+    }
+
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        iif lo accept
+        ct state established,related accept
+        ct state invalid drop
+
+        # 基础可达性
+        ip protocol icmp accept
+        ip6 nexthdr ipv6-icmp accept
+
+        # 管理面：只允许内网
+        tcp dport 22 ip saddr @lan_net accept
+
+        # 解析面：只允许边界路由（占位 192.0.2.1）
+        ip saddr 192.0.2.1 tcp dport 53 accept
+        ip saddr 192.0.2.1 udp dport 53 accept
+
+        # 出口面：只允许边界路由访问本地转发端口
+        ip saddr 192.0.2.1 tcp dport { 7890, 7891, 1234 } accept
+        ip saddr 192.0.2.1 udp dport { 7890, 1234 } accept
+
+        # 其余一律丢弃（policy drop 已覆盖，这里不写 log 以免刷屏）
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+        # 盒子是旁路，不做转发
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}

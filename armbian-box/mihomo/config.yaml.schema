@@ -1,0 +1,45 @@
+# =====================================================================
+# 配置字段骨架 —— 只说明"有哪些字段、各自干什么"
+#
+# 这不是可运行配置：
+#   - proxies 永远为空
+#   - proxy-providers 永远为空
+#   - 组内只有 DIRECT
+# 节点相关内容本仓库不提供、不暗示来源。
+# =====================================================================
+
+mode: rule                 # 规则模式
+log-level: warning         # silent/error/warning/info/debug
+ipv6: false                # 家庭网络里通常先关，避免 AAAA 绕路
+find-process-mode: off     # 进程匹配开销大，旁路场景一般不需要
+interface-name: ""         # 绑定出口网卡时填，留空表示不绑定
+
+dns:
+  enable: true
+  ipv6: false
+  listen: 0.0.0.0:1053     # 只给边界路由访问，端口不要对公网暴露
+  enhanced-mode: fake-ip   # 或 redir-host，与路由侧规则必须一致
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver:
+    - 192.0.2.53           # 占位：仅用于解析上游服务器域名
+  nameserver:
+    - 192.0.2.53           # 占位：直连解析
+  fallback: []             # 占位：按需填写，本仓库不提供
+  fake-ip-filter:
+    - "*.lan"
+    - "*.local"
+    - "router.example"
+  respect-rules: false
+
+# ---- 以下三段必须由使用者自行填充，默认空 ----
+proxies: []
+proxy-providers: {}
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies: []            # 填入自建组名或节点名；留空时全部走 DIRECT
+
+rules:
+  - GEOIP,PRIVATE,DIRECT,no-resolve
+  - MATCH,DIRECT

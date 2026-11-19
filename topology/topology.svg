@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="680" viewBox="0 0 1080 680" role="img" aria-label="家庭网络三层职责拓扑图">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowAccent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f766e"/>
+    </marker>
+    <style>
+      .title { font: 600 20px "Microsoft YaHei","Noto Sans CJK SC",sans-serif; fill: #0f172a; }
+      .sub   { font: 13px "Microsoft YaHei","Noto Sans CJK SC",sans-serif; fill: #64748b; }
+      .lbl   { font: 600 15px "Microsoft YaHei","Noto Sans CJK SC",sans-serif; fill: #0f172a; }
+      .sm    { font: 12px "Microsoft YaHei","Noto Sans CJK SC",sans-serif; fill: #475569; }
+      .mono  { font: 11px "Consolas","Cascadia Mono",monospace; fill: #475569; }
+      .edge  { stroke: #475569; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .edge2 { stroke: #475569; stroke-width: 1.6; fill: none; marker-start: url(#arrow); marker-end: url(#arrow); }
+      .edgeA { stroke: #0f766e; stroke-width: 2; fill: none; marker-start: url(#arrowAccent); marker-end: url(#arrowAccent); }
+    </style>
+  </defs>
+
+  <rect width="1080" height="680" fill="#f8fafc"/>
+  <text x="40" y="46" class="title">家庭网络：三层职责与数据流</text>
+  <text x="40" y="70" class="sub">K2P B1（华硕系固件）做边界，盒子做解析与出口；地址均为文档保留段占位</text>
+
+  <!-- 上游 -->
+  <rect x="40" y="130" width="180" height="120" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="130" y="170" class="lbl" text-anchor="middle">上游 / 光猫</text>
+  <text x="130" y="196" class="sm" text-anchor="middle">PPPoE 或 DHCP</text>
+  <text x="130" y="218" class="mono" text-anchor="middle">0.0.0.0/0</text>
+
+  <!-- 边界层 -->
+  <rect x="300" y="100" width="360" height="240" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <rect x="300" y="100" width="360" height="38" rx="14" fill="#0f766e"/>
+  <rect x="300" y="124" width="360" height="14" fill="#0f766e"/>
+  <text x="480" y="126" class="lbl" fill="#ffffff" text-anchor="middle">边界层 · K2P B1</text>
+  <text x="322" y="170" class="sm">· WAN 拨号 / NAT / DHCP</text>
+  <text x="322" y="196" class="sm">· HWNAT 开关核对（只读）</text>
+  <text x="322" y="222" class="sm">· dnsmasq：局域网唯一 DNS 入口</text>
+  <text x="322" y="248" class="sm">· ipset 集合填充</text>
+  <text x="322" y="274" class="sm">· 对盒子的限源访问控制</text>
+  <text x="322" y="306" class="mono">192.0.2.1/24（占位）</text>
+
+  <!-- 终端 -->
+  <rect x="740" y="130" width="300" height="120" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="890" y="170" class="lbl" text-anchor="middle">终端</text>
+  <text x="890" y="196" class="sm" text-anchor="middle">有线 / 2.4G / 5G</text>
+  <text x="890" y="220" class="mono" text-anchor="middle">网关与 DNS 均指向 192.0.2.1</text>
+
+  <!-- 盒子 -->
+  <rect x="380" y="450" width="360" height="180" rx="14" fill="#ffffff" stroke="#1d4ed8" stroke-width="2"/>
+  <rect x="380" y="450" width="360" height="38" rx="14" fill="#1d4ed8"/>
+  <rect x="380" y="474" width="360" height="14" fill="#1d4ed8"/>
+  <text x="560" y="476" class="lbl" fill="#ffffff" text-anchor="middle">解析层 + 出口层 · 机顶盒</text>
+  <text x="402" y="518" class="sm">· 上游解析器（pdnsd / 本地 DoH）</text>
+  <text x="402" y="544" class="sm">· 单实例守卫，只接受边界层查询</text>
+  <text x="402" y="570" class="sm">· 出口端口仅对边界层源地址开放</text>
+  <text x="402" y="596" class="sm">· 探活状态机（契约见 docs/）</text>
+  <text x="402" y="620" class="mono">192.0.2.3（占位）</text>
+
+  <!-- 分流出口 -->
+  <rect x="840" y="450" width="200" height="120" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="940" y="494" class="lbl" text-anchor="middle">分流出口</text>
+  <text x="940" y="520" class="sm" text-anchor="middle">由使用者自行配置</text>
+  <text x="940" y="542" class="mono" text-anchor="middle">本仓库不提供</text>
+
+  <!-- 连线 -->
+  <path d="M 220 190 L 300 190" class="edge2"/>
+  <text x="260" y="180" class="sm" text-anchor="middle">WAN</text>
+
+  <path d="M 660 175 L 740 175" class="edge2"/>
+  <text x="700" y="165" class="sm" text-anchor="middle">LAN / WiFi</text>
+
+  <path d="M 420 340 L 420 450" class="edge2"/>
+  <text x="300" y="392" class="sm" text-anchor="end">DNS 查询 :53</text>
+  <text x="300" y="414" class="sm" text-anchor="end">上游解析 :853/:443</text>
+
+  <path d="M 600 340 L 600 450" class="edge2"/>
+  <text x="612" y="382" class="sm">TCP 转发 → 出口端口</text>
+  <text x="612" y="404" class="sm">ipset 命中的目的</text>
+
+  <path d="M 740 540 L 840 520" class="edgeA"/>
+  <text x="790" y="556" class="sm" text-anchor="middle">按规则分流</text>
+
+  <!-- 说明 -->
+  <text x="40" y="652" class="sub">注：盒子为单臂旁路，不承载全量内网流量，因此百兆网口不会成为全网瓶颈。</text>
+</svg>
