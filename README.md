@@ -26,7 +26,9 @@
 - **出口层（盒子）**：本地转发端口（HTTP/SOCKS/透明）只对边界层的源地址开放，其余一律拒绝。
 
 拓扑与数据流见 [topology/topology.svg](topology/topology.svg)（源图 [topology.drawio](topology/topology.drawio)，可自行改）。
-真实环境截图见 [topology-real.png](topology/topology-real.png)（含真实内网网段与设备型号，仅作对照，不用于实际部署）。
+真实环境截图（含真实内网网段与设备型号，仅作对照，不用于实际部署）：
+
+![真实环境拓扑](topology/topology-real.png)
 
 ## 3. 一次域名解析的完整路径
 
